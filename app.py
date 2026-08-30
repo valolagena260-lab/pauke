@@ -86,7 +86,7 @@ def main():
         print("Content-Type: application/json\n")
         print(json_output)
         
-        with open('extracted_channels.json', 'w', encoding='utf-8') as f:
+        with open('hummer.json', 'w', encoding='utf-8') as f:
             f.write(json_output)
     else:
         print("Content-Type: application/json\n")
