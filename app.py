@@ -4,21 +4,26 @@ import urllib.error
 import re
 import json
 import sys
+import ssl
+
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 ENCODED_SOURCE = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FidXNhZWVpZHgvSVBUVi1TY3JhcGVyLVppbGxhL3JlZnMvaGVhZHMvbWFpbi9CRC5tM3U='
 ENCODED_TARGET = 'aHR0cHM6Ly9ibGRjbXByb2QtY2RuLnRvZmZlZWxpdmUuY29t'
 
 def decode_string(encoded_bytes):
-    """Decodes a base64 encoded string."""
     return base64.b64decode(encoded_bytes).decode('utf-8')
 
 def fetch_playlist_content(url):
-    """Fetches the playlist content from the given URL with a specific User-Agent."""
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:
-        with urllib.request.urlopen(req) as response:
+        context = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, context=context, timeout=15) as response:
             return response.read().decode('utf-8')
-    except urllib.error.URLError as e:
+    except Exception as e:
         print(f"Error fetching data: {e}", file=sys.stderr)
         return None
 
@@ -73,24 +78,29 @@ def parse_m3u(content, filter_string):
     return channels
 
 def main():
-    source_url = decode_string(ENCODED_SOURCE)
-    target_filter = decode_string(ENCODED_TARGET)
+    try:
+        source_url = decode_string(ENCODED_SOURCE)
+        target_filter = decode_string(ENCODED_TARGET)
 
-    content = fetch_playlist_content(source_url)
+        content = fetch_playlist_content(source_url)
 
-    if content:
-        extracted_channels = parse_m3u(content, target_filter)
-        
-        json_output = json.dumps(extracted_channels, indent=4, ensure_ascii=False)
-        
-        print("Content-Type: application/json\n")
-        print(json_output)
-        
-        with open('hummer.json', 'w', encoding='utf-8') as f:
-            f.write(json_output)
-    else:
-        print("Content-Type: application/json\n")
-        print(json.dumps({"error": "Failed to fetch playlist"}))
+        if content:
+            extracted_channels = parse_m3u(content, target_filter)
+            
+            json_output = json.dumps(extracted_channels, indent=4, ensure_ascii=False)
+            
+            print("Content-Type: application/json\n")
+            print(json_output)
+            
+            with open('hummer.json', 'w', encoding='utf-8') as f:
+                f.write(json_output)
+        else:
+            print("Content-Type: application/json\n")
+            print(json.dumps({"error": "Failed to fetch playlist"}))
+            sys.exit(1)
+    except Exception as e:
+        print(f"Critical error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
