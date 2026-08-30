@@ -28,7 +28,6 @@ jobs:
     - name: Run Update Scripts
       run: |
         python app.py
-        python app2.py
 
     - name: Commit and Push changes
       run: |
