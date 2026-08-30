@@ -1,42 +1,29 @@
-import base64
 import urllib.request
-import urllib.error
-import re
+import base64
 import json
-import sys
+import re
 import ssl
 
-try:
-    sys.stdout.reconfigure(encoding='utf-8')
-except Exception:
-    pass
-
-ENCODED_SOURCE = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FidXNhZWVpZHgvSVBUVi1TY3JhcGVyLVppbGxhL3JlZnMvaGVhZHMvbWFpbi9CRC5tM3U='
-ENCODED_TARGET = 'aHR0cHM6Ly9ibGRjbXByb2QtY2RuLnRvZmZlZWxpdmUuY29t'
+ENCODED_SOURCE = b'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FidXNhZWVpZHgvSVBUVi1TY3JhcGVyLVppbGxhL3JlZnMvaGVhZHMvbWFpbi9CRC5tM3U='
+ENCODED_TARGET = b'aHR0cHM6Ly9ibGRjbXByb2QtY2RuLnRvZmZlZWxpdmUuY29t'
 
 def decode_string(encoded_bytes):
     return base64.b64decode(encoded_bytes).decode('utf-8')
 
 def fetch_playlist_content(url):
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    context = ssl._create_unverified_context()
     try:
-        context = ssl._create_unverified_context()
-        with urllib.request.urlopen(req, context=context, timeout=15) as response:
+        with urllib.request.urlopen(req, context=context) as response:
             return response.read().decode('utf-8')
     except Exception as e:
-        print(f"Error fetching data: {e}", file=sys.stderr)
+        print(f"Error fetching playlist: {e}")
         return None
 
 def parse_m3u(content, filter_string):
     channels = []
     lines = content.split('\n')
-    
-    current_channel = {
-        "name": "",
-        "logo": "",
-        "link": "",
-        "cookie": ""
-    }
+    current_channel = {"name": "", "logo": "", "link": "", "cookie": ""}
 
     for line in lines:
         line = line.strip()
@@ -64,43 +51,26 @@ def parse_m3u(content, filter_string):
 
         elif not line.startswith('#'):
             current_channel['link'] = line
-            
             if filter_string in line:
-                channels.append(current_channel.copy())
-            
-            current_channel = {
-                "name": "",
-                "logo": "",
-                "link": "",
-                "cookie": ""
-            }
+                channels.append(current_channel)
+            current_channel = {"name": "", "logo": "", "link": "", "cookie": ""}
 
     return channels
 
 def main():
-    try:
-        source_url = decode_string(ENCODED_SOURCE)
-        target_filter = decode_string(ENCODED_TARGET)
+    source_url = decode_string(ENCODED_SOURCE)
+    target_filter = decode_string(ENCODED_TARGET)
+    content = fetch_playlist_content(source_url)
 
-        content = fetch_playlist_content(source_url)
+    if content:
+        extracted_channels = parse_m3u(content, target_filter)
+        json_output = json.dumps(extracted_channels, indent=4, ensure_ascii=False)
+        
+        with open('hummer.json', 'w', encoding='utf-8') as f:
+            f.write(json_output)
+        print("Success: hummer.json created/updated.")
+    else:
+        print(json.dumps({"error": "Failed to fetch playlist"}))
 
-        if content:
-            extracted_channels = parse_m3u(content, target_filter)
-            
-            json_output = json.dumps(extracted_channels, indent=4, ensure_ascii=False)
-            
-            print("Content-Type: application/json\n")
-            print(json_output)
-            
-            with open('hummer.json', 'w', encoding='utf-8') as f:
-                f.write(json_output)
-        else:
-            print("Content-Type: application/json\n")
-            print(json.dumps({"error": "Failed to fetch playlist"}))
-            sys.exit(1)
-    except Exception as e:
-        print(f"Critical error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
